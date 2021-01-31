@@ -1,0 +1,176 @@
+\section{Car removal and restoration - Step 6}
+
+This feature requires interaction with threads, even when they are suspended in a condition queue or waiting for a semaphore. Several approaches were tried out. These will be briefly outlined, and the final and most costless solution will be explained more thoroughly. 
+
+The feature must support choosing a car, at any position on the board/playground, removing the car both visually and from all synchronization protocols from other cars, and restoring it at its gate at will.\footnote{Barrier and bridge is removed from this solution, as allowed in the assignment description.}
+
+A car may be in either of the states:
+\begin{itemize}
+    \item Waiting to pass the gate
+    \item Waiting to enter the alley
+    \item Waiting for a tile to get free
+    \item Transitioning from one til to another
+    \item Driving inside the alley
+    \item Leaving the alley
+    \item Freeing the old position after a transition
+\end{itemize}
+
+Each of these states must be handled properly and the solution must generalize to accomodate each scenario.
+
+\underline{\textbf{First approach}}
+
+In the \texttt{CarControl} object, when removing a car it was stopped\footnote{The "speed" of the car was set to Integer.MAX\_VALUE, which would stop the car, since the speed property of the car dictates the delay between each move.}, the position was cleared, the gate was closed, starting position was set to its gate and the speed was set to its initial value. Restoring the car then only meant marking the car again and restoring the gates state before the cars removal. This however does not accomodate for any condition queues or history variables for e.g. cars in the alley.
+
+\underline{\textbf{Second approach}}
+
+The first approach was updated, checking if the car was in the alley, then calling the \texttt{leave} protocol from the alley to restore order. Guards were inserted into the alley monitor and a monitor solution replacing the tile semaphores, where \texttt{notifyAll} could be called, and if the car was being removed, it was released from the monitor. The procedure from the first approach would then proceed placing it at the gate waiting to be restored. This however did not accomodate a car already waiting at its gate, and would demand several checks for each monitor interaction, and releasing all cars from condition queues whenever a car was removed.
+
+\underline{\textbf{Third approach}}
+
+A \texttt{pitstop} was introduced in the beginning of the cars \texttt{run} loop, where if the car was removed (the \texttt{broken} flag was set), it would enter and wait to be restored. By introducing a breakpoint in the cars \texttt{run} loop, it is known that the car is not currently in a transition from one tile to another. This simplifies clearing the cars position. The guards from the monitors were removed, and instead of using \texttt{notifyAll} operations, the car is instead interrupted, waking up the car and rushing it to the \texttt{pitstop}. Since the car can reach several states where it must be interrupted, the main thread would keep interrupting the car until it reaches the \texttt{pitstop}. From here, the restoring protocol would take action, knowing that the car is not in the middle of another synchronization procedure. This solution seemed extensive with several interrupts and was not faithful to the no bumping rule, as the cars could be interrupted during a transition and crash before being removed. The excessive interrupts also count as a short busywait for the main thread, which is unwanted.
+
+\underline{\textbf{The fourth and final approach}}
+
+A more systematic procedure was needed. The concept of interrupting the car seemed solid, and a nonintrusive way of removing the car from any condition queue. Instead of waiting for the car to reach the \texttt{pitstop}, it could be set there directly from the handler for the catch scope for the \texttt{InterruptException}. Since the \texttt{pitstop} is in the beginning of the \texttt{run} loop, it can be set directly by calling \texttt{continue} in the loop. For each step, the following catches were introduced in the loop:
+
+
+\textbf{Waiting to pass the gate}
+
+If the car is waiting at the gate, it is caught and placed in the \texttt{pitstop} 
+
+\begin{lstlisting}[language=java]
+if (atGate(curpos)) { 
+    try{mygate.pass(); }catch(InterruptedException ie){continue;}
+    speed = chooseSpeed();
+}
+\end{lstlisting}
+
+\textbf{Waiting to enter the alley}
+
+When waiting for the alley, we know that the car has not yet reserved a new spot, and it has not been allowed in yet. The car can be placed in the \texttt{pitstop}.
+
+\begin{lstlisting}[language=java]
+if(cr.enteringAlley(no, newpos))
+{
+    try{cr.alley.enter(no);}catch(InterruptedException ie){continue;}
+}
+\end{lstlisting}
+
+\textbf{Waiting for a tile to get free}
+
+At this state, the car may have been allowed in the alley for the new position, this has to be checked for as the current position is still outside the alley. When making sure the car is not in the alley, it is placed in the \texttt{pitstop}.
+
+\begin{lstlisting}[language=java]
+try
+{
+    cr.reserve(newpos);
+}
+catch(InterruptedException ie)
+{ 
+    if(cr.enteringAlley(no, newpos))
+        cr.alley.leave(no);
+    continue;
+}
+\end{lstlisting}
+
+\textbf{Transitioning from one tile to another}
+
+During a transition from one spot to another the car is allowed to proceed to ensure, that the marking is executing correctly. The \texttt{interrupt flag} is still set, meaning that if the car has not yet met the \texttt{sleep} operation in the middle, it will immediately get caught and set to proceed.
+
+\begin{lstlisting}[language=java]
+cd.clear(curpos);
+cd.mark(curpos, newpos,col,no);
+try{sleep(speed());}catch(InterruptedException ie){}
+cd.clear(curpos, newpos);
+cd.mark(newpos,col,no);
+
+curpos = newpos;
+\end{lstlisting}
+
+\textbf{Driving inside the alley}
+
+If the car is removed while being inside the alley, the alley's \texttt{leave} operation is called in the \texttt{pitstop} procedure as shown later.
+
+\textbf{Leaving the alley}
+
+Leaving the alley does not involve any condition queue, and the car is left to proceed to the \texttt{pitstop} naturally.
+
+\begin{lstlisting}[language=java]
+if(cr.exitingAlley(no, curpos))
+{
+    cr.alley.leave(no);
+}
+\end{lstlisting}
+
+\textbf{Freeing the old position after a transition}
+
+Freeing the old position does not involve any condition queue either, and the car also is left to proceed to the \texttt{pitstop} naturally.
+
+\begin{lstlisting}[language=java]
+cr.free(oldpos);
+\end{lstlisting}
+
+
+When the car is broken and enters the \texttt{pitstop} in the beginning of its run loop, it calls the pitstop protocol located in the \texttt{CarControl}. At this point, it is crucial that no operation takes place which would suspend the main thread running the GUI and handling \texttt{CarControl}. The protocol is seen in code snippet \ref{src:pitstop}.
+
+\begin{lstlisting}[language=java, label=src:pitstop]
+public synchronized void pitstop(int no) throws Exception
+{
+    Car brokenCar = car[no];
+    Pos oldpos = brokenCar.curpos;
+    cd.clear(brokenCar.curpos);
+    free(brokenCar.curpos);
+    brokenCar.curpos = brokenCar.startpos;
+    
+    if(inAlley(no, oldpos))
+        alley.leave(no);
+    
+    carRestored[no].V();
+    while(brokenCar.broken)
+        try{wait();}catch(InterruptedException ie){}
+}
+\end{lstlisting}
+
+In the pitstop, the broken car is cleared, removed and placed in a condition queue in the main thread. The \texttt{wait} call is surrounded in a \texttt{try-catch} ensuring that it is kept in the condition queue independent of its \texttt{interrupt flag} status, the \texttt{while loop} ensures that if the car is woken either by the \texttt{try-catch} or from spurious wakeup it returns to the condition queue, until it is restored.
+
+This leaves the initial \texttt{removeCar} and \texttt{restoreCare} methods, which have become very simple, as seen in code snippet \ref{src:removeCar} and \ref{src:restoreCar}, mainly setting the \texttt{broken} flag and interrupting once when removing, and placing the car at the gate, taking down the \texttt{broken} flag an waking the car up when restoring.
+
+\begin{figure}[H]
+\begin{lstlisting}[language=java, caption=removeCar method, label=src:removeCar]
+public void removeCar(int no){ 
+
+    Car brokenCar = car[no];
+
+    if(brokenCar.broken)
+        return;
+
+    brokenCar.broken = true;
+    brokenCar.interrupt();
+
+}
+\end{lstlisting}
+\end{figure}
+
+\begin{figure}[H]
+\begin{lstlisting}[language=java, caption=restoreCar method, label=src:restoreCar]
+public void restoreCar(int no) { 
+    Car brokenCar = car[no];
+
+    if(!brokenCar.broken)
+        return;
+
+    try{carRestored[no].P();}catch(InterruptedException ie){}
+    try{reserve(brokenCar.curpos);}catch(Exception e){}
+    cd.mark(brokenCar.curpos, brokenCar.col, no);
+    brokenCar.broken = false;
+    synchronized(this){notifyAll();}
+}
+\end{lstlisting}
+\end{figure}
+
+Finally, there is a semaphore array called \texttt{carRestored} which is used to make sure, that the car has hit the \texttt{pitstop} before the car is restored. This semaphore is essentially able to freeze the main thread, but since all interactions with the condition queues, between the car removal and the \texttt{pitstop}, is handled, this does not occur. Slight stuttering is visible while cars are removed and restored in rapid succession, but this is deemed okay, as it is an unrealistic misuse of the program.
+
+In order to place the car in the condition queue in the \texttt{pitstop} method, it must be done in a synchronized scope, no operation in the method is sensitive to mutual exclusion, as the car is certain to be in the \texttt{pitstop}, the whole method is therefore synchronized. The \texttt{removeCar} method is not synchronized, as the only important thing here is, that the \texttt{broken} flag is set before the \texttt{interrupt}. Interleavings are not a risk. The \texttt{restoreCar} method has a \texttt{P} operation meaning if the method is synchronized it could deadlock if a car was trying to move as the \texttt{reserve} and \texttt{free} methods, for mutual exclusion between tiles, are synchronized. Therefore only the \texttt{nofityAll} operation is synchronized.
+ 
+
+The fact that interrupts are used, also means, that when testing the program, \texttt{sleep} operations which are not surrounded by a \texttt{try-catch} operation when removing a car, will throw an \texttt{InterruptedException} when encountered.

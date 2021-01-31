@@ -1,0 +1,25 @@
+\subsection{EXTRA C - No Starvaiton (Opg 4.2)}
+In this part of the assignment we will focus on extending the monitor solution for the alley as seen in section \ref{step4}, so as to implement fairness. This was implemented through a counter in the \texttt{enter} method in the alley. The new method can be seen below.
+
+\begin{lstlisting}
+    public synchronized void enter(int no) throws Exception {
+        if(no<=4) //Top going down {   
+            while(carsBottom > 0 || 
+                  topCarsThrough > bottomCarsThrough + 3)
+                    wait();
+            carsTop++;
+            topCarsThrough++;
+        }
+        else //Bottom going up { 
+            while(carsTop > 0 || 
+                  bottomCarsThrough > topCarsThrough + 3) 
+                    wait();
+            carsBottom++;
+            bottomCarsThrough++;
+        }
+    }
+\end{lstlisting}
+
+In essence, the extension counts how many cars have gone through on either side of the alley. If one side gets through too many times in a row, any further cars from that side get blocked. This ensures that, if cars from both sides are running, each side will get through the alley eventually. If, however, only cars from one side is running, they will eventually hit the limit and get blocked. This, of course, is less than optimal when running the cars alone, but it ensures fairness when the two sets of cars are running simultaneously. This could be delt with, by either resetting the counter when the last groupmember exits the alley or checking if any cars from the opposing groups is running i.e. not at the gate or barrier.
+
+We tested whether the program avoided starvation by running the cars through the alley with slowdown. Before, this would lead to one side making lap upon lap around the course, and the other simply waiting to get into the alley. This no longer proved to be the case, as now the cars would stop before entering the alley if all four had passed through. This allowed the other side to pass through the alley as well, thus avoiding starvation.

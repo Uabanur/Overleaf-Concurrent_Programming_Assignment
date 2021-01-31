@@ -1,0 +1,6 @@
+\section*{Introduction}
+In this report, we will detail how we used semaphores and monitors to solve a mutual exclusion problem. 9 cars drive around on a playground. 4 go one way around, and 4 the other way. The 9th car follows its own track, separate from the others. The 8 regular cars, however, all need to through the alley in the back of the playground. The problem is, there is not enough room for the cars to pass each other whilst inside the alley! We would like to avoid this, as the kids driving the cars tend to get into fights when disagreeing.
+
+First, we will solve the mutual exclusion problem in the alley using semaphores. This will be implemented in a \texttt{Java} program. This solution will be tested through \texttt{SPIN}, ensuring correctness of the solution. Afterwards, we will implement monitors through \texttt{synchronized} methods. 
+
+Source code for all steps is found in the appendix. For testing, all steps primarily used the same tests; setting all car speeds to 5, simulating \textit{almost} toddlers. The only exception in the tests is the final step, where test 1 was introduced to test rapid removal and restoring of cars.

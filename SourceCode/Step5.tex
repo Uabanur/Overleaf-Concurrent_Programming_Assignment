@@ -1,0 +1,411 @@
+\section*{Step 5 EXTRA CarControl}
+\addcontentsline{toc}{section}{Step 5 EXTRA CarControl}
+\begin{lstlisting}[language=java]
+//Prototype implementation of Car Control
+//Mandatory assignment
+//Course 02158 Concurrent Programming, DTU, Fall 2017
+
+//Hans Henrik Lovengreen   Oct 9, 2017
+
+
+import java.awt.Color;
+
+
+class Gate {
+
+  Semaphore g = new Semaphore(0);
+  Semaphore e = new Semaphore(1);
+  boolean isopen = false;
+
+  public void pass() throws InterruptedException {
+    g.P(); 
+    g.V();
+  }
+
+  public void open() {
+    try { e.P(); } catch (InterruptedException e) {}
+    if (!isopen) { g.V();  isopen = true; }
+    e.V();
+  }
+
+  public void close() {
+    try { e.P(); } catch (InterruptedException e) {}
+    if (isopen) { 
+      try { g.P(); } catch (InterruptedException e) {}
+      isopen = false;
+    }
+    e.V();
+  }
+}
+
+class Car extends Thread {
+
+  int basespeed = 100;       // Rather: degree of slowness
+  int variation =  50;       // Percentage of base speed
+
+  CarDisplayI cd;          // GUI part
+  CarControl cr;
+
+  int no;              // Car number
+  Pos startpos;          // Startpositon (provided by GUI)
+  Pos barpos;            // Barrierpositon (provided by GUI)
+  Color col;             // Car  color
+  Gate mygate;           // Gate at startposition
+
+  int speed;             // Current car speed
+  Pos oldpos;            // Old position. Used to free old spot after move.
+  Pos curpos;            // Current position 
+  Pos newpos;            // New position to go to
+
+  public Car(int no, CarDisplayI cd, CarControl cr, Gate g) {
+
+    this.no = no;
+    this.cd = cd;
+    this.cr = cr;
+
+    mygate = g;
+    startpos = cd.getStartPos(no);
+    barpos = cd.getBarrierPos(no);  // For later use
+
+    col = chooseColor();
+
+    // do not change the special settings for car no. 0
+    if (no==0) {
+      basespeed = 0;  
+      variation = 0; 
+      setPriority(Thread.MAX_PRIORITY); 
+    }
+  }
+
+  public synchronized void setSpeed(int speed) { 
+    if (no != 0 && speed >= 0) {
+      basespeed = speed;
+    }
+    else
+      cd.println("Illegal speed settings");
+  }
+
+  public synchronized void setVariation(int var) { 
+    if (no != 0 && 0 <= var && var <= 100) {
+      variation = var;
+    }
+    else
+      cd.println("Illegal variation settings");
+  }
+
+  synchronized int chooseSpeed() { 
+    double factor= (1.0D+(Math.random()-0.5D)*2*variation/100);
+    return (int) Math.round(factor*basespeed);
+  }
+
+  private int speed() {
+    // Slow down if requested
+    final int slowfactor = 3;  
+    return speed * (cd.isSlow(curpos)? slowfactor : 1);
+  }
+
+  Color chooseColor() { 
+    return Color.blue; // You can get any color, as longs as it's blue 
+  }
+
+  Pos nextPos(Pos pos) {
+    // Get my track from display
+    return cd.nextPos(no,pos);
+  }
+
+  boolean atGate(Pos pos) {
+    return pos.equals(startpos);
+  }
+
+   public void run() {
+    try {
+
+      speed = chooseSpeed();
+      
+      cr.reserve(startpos);
+      curpos = startpos;
+      cd.mark(curpos,col,no);
+
+      while (true) { 
+        sleep(speed());
+
+        if (atGate(curpos)) { 
+          mygate.pass(); 
+          speed = chooseSpeed();
+        }
+        	
+        newpos = nextPos(curpos);
+        
+        oldpos = curpos;
+
+        if((no <= 2 && newpos.col == 0 && newpos.row == 2) ||
+           (no <= 4 && newpos.col == 2 && newpos.row == 1) ||
+           (no >= 5 && newpos.col == 0 && newpos.row == 9) )
+        {
+          cr.alley.enter(no);
+        }
+
+        if((no <= 4 && newpos.row == 5 && newpos.col > 2) ||
+           (no >= 5 && newpos.row == 6 && newpos.col > 6) )
+        {
+          cr.barrier.sync(no, curpos);
+        }
+
+        if((no <= 4 && newpos.row == 9 && newpos.col == 1) ||
+           (no >= 5 && newpos.row == 10 && newpos.col == 3) )
+        {
+          cr.bridge.enter();
+        }
+
+        cr.reserve(newpos);
+
+        cd.clear(curpos);
+        cd.mark(curpos, newpos,col,no);
+        sleep(speed());
+        cd.clear(curpos, newpos);
+        cd.mark(newpos,col,no);
+
+        if((no <= 4 && curpos.col == 1 && curpos.row == 9) ||
+           (no >= 5 && curpos.col == 2 && curpos.row == 0) )
+        {
+          cr.alley.leave(no);
+        }
+
+        if((no <= 4 && newpos.row == 9 && newpos.col == 4) ||
+           (no >= 5 && newpos.row == 10 && newpos.col == 0) )
+        {
+          cr.bridge.leave();
+        }
+
+        curpos = newpos;
+
+        cr.free(oldpos);
+
+      }
+
+    } catch (Exception e) {
+      cd.println("Exception in Car no. "+no);
+      System.err.println("Exception in Car no. "+no+":"+e);
+      e.printStackTrace();
+    }
+  }
+}
+
+
+class Alley {
+  short carsTop = 0;
+  short carsBottom= 0;
+  int topCarsThrough = 0;
+  int bottomCarsThrough = 0;
+
+  public synchronized void enter(int no) throws Exception
+  {
+    if(no<=4) //Top going down
+    {   
+      while(carsBottom>0||topCarsThrough>bottomCarsThrough+3) 
+        wait();
+      carsTop++;
+      topCarsThrough++;
+    }
+    else //Bottom going up
+    { 
+      while(carsTop>0||bottomCarsThrough>topCarsThrough+3)
+      wait();
+      carsBottom++;
+      bottomCarsThrough++;
+    }
+  }
+
+  public synchronized void leave(int no) throws Exception
+  {
+    if(no<=4) //Top going down
+    {
+      carsTop--;
+      if(carsTop==0)
+        notifyAll();
+    }
+    else //Bottom going up
+    { 
+      carsBottom--;
+      if(carsBottom==0)
+        notifyAll();
+    }
+  }
+}
+
+class Barrier 
+{
+  int carsAtBarrier = 0;
+
+  boolean barrierOnline = false;
+  boolean shutdown = false;
+
+  public synchronized void sync(int no, Pos curpos) throws Exception 
+  {
+    if ( barrierOnline )
+    {
+      carsAtBarrier++;
+      if(carsAtBarrier == 9)
+      {
+        carsAtBarrier = 0;
+        notifyAll();
+        if(shutdown)
+          this.off();
+      }
+      else
+      {
+        wait();
+      }
+    }
+  }
+
+  // Turn barrier on
+  public synchronized void on() 
+  {
+    shutdown = false;
+    carsAtBarrier = 0;
+    barrierOnline = true;
+  }
+
+  public synchronized void off() 
+  {
+    barrierOnline = false;
+    notifyAll();
+  }
+
+  public synchronized void shutdown()
+  {
+    shutdown = true;
+    if(carsAtBarrier == 0)
+      this.off();
+  }
+}
+
+class Bridge
+{
+  int limit = 6;
+  int onBridge = 0;
+  public synchronized void enter() throws Exception
+  {
+    while(this.onBridge >= this.limit) wait();
+    this.onBridge++;
+  }
+
+  public synchronized void leave()
+  {
+    this.onBridge--;
+    notify();
+  }
+
+  public synchronized void setLimit(int k)
+  {
+    this.limit = k;
+    notifyAll();
+  }
+}
+
+
+public class CarControl implements CarControlI{
+
+  CarDisplayI cd;       // Reference to GUI
+  Car[]  car;         // Cars
+  Gate[] gate;        // Gates
+
+  Alley alley;
+  Barrier barrier;
+  Bridge bridge;
+
+  private final int ROWS = 11;
+  private final int COLS = 12;
+  Semaphore[][] areaSem = new Semaphore[ROWS][COLS];
+
+  public CarControl(CarDisplayI cd) {
+    this.cd = cd;
+    car  = new  Car[9];
+    gate = new Gate[9];
+
+    alley = new Alley();
+    barrier = new Barrier();
+    bridge = new Bridge();
+
+    //Set all areas as free
+    for(int i = 0; i < ROWS; i++){
+      for(int j = 0; j < COLS; j++){
+        areaSem[i][j] = new Semaphore(1);
+      }
+    }
+
+    for (int no = 0; no < 9; no++) {
+      gate[no] = new Gate();
+      car[no] = new Car(no,cd,this,gate[no]);
+      car[no].start();
+    } 
+  }
+
+
+  public void reserve(Pos pos){
+    try{
+      areaSem[pos.row][pos.col].P();
+    } catch(Exception e) {}
+  }
+
+  public void free(Pos pos){
+    areaSem[pos.row][pos.col].V();
+  }
+
+  public void startCar(int no) {
+    gate[no].open();
+  }
+
+  public void stopCar(int no) {
+    gate[no].close();
+  }
+
+  
+  public void barrierOn() {
+    barrier.on();
+    cd.println("Barrier System Online");
+  }
+
+  public void barrierOff() { 
+    barrier.off();
+    cd.println("Barrier System Offline");
+  }
+
+  public void barrierShutDown() { 
+    barrier.shutdown();
+    cd.println("Initiating Barrier Shutdown");
+  }
+
+  public void setLimit(int k) { 
+    bridge.setLimit(k);
+    cd.println("Bridge limit set to " + k);
+  }
+
+  public void removeCar(int no) { 
+    cd.println("Remove Car not implemented in this version");
+  }
+
+  public void restoreCar(int no) { 
+    cd.println("Restore Car not implemented in this version");
+  }
+
+  /* Speed settings for testing purposes */
+
+  public void setSpeed(int no, int speed) { 
+    car[no].setSpeed(speed);
+  }
+
+  public void setVariation(int no, int var) { 
+    car[no].setVariation(var);
+  }
+
+}
+
+
+
+
+
+
+
+\end{lstlisting}

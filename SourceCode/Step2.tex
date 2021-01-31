@@ -1,0 +1,104 @@
+\section*{Step 2 SPIN verification}
+\addcontentsline{toc}{section}{Step 2 SPIN verification}
+\begin{lstlisting}[language=promela]
+#ifndef N
+#define N	4 /* Best be a multiple of two */
+#endif
+
+/*Semaphores*/
+int sInAlley = 1;
+int sTopMutex = 1;
+int sBottomMutex = 1;
+
+inline sInAlleyP(){
+atomic {do :: sInAlley==0 -> skip; :: else -> sInAlley--;break; od;}
+}
+inline sInAlleyV(){
+atomic {sInAlley++}
+}
+
+inline sTopMutexP(){
+atomic {do :: sTopMutex==0 -> skip; :: else -> sTopMutex--;break; od;}
+}
+inline sTopMutexV(){
+atomic {sTopMutex++}
+}
+inline sBottomMutexP(){
+atomic {do :: sBottomMutex==0 -> skip; :: else -> sBottomMutex--;break; od;}
+}
+inline sBottomMutexV(){
+atomic {sBottomMutex++}	
+}
+
+/*Alley*/
+int carsTop = 0;
+int carsDown = 0;
+inline alleyEnter(no)
+{
+    if :: no < N/2 -> 
+        sTopMutexP();
+        if :: carsTop == 0 ->
+            sInAlleyP();
+         :: else -> skip;
+        fi;
+        carsTop++;
+        sTopMutexV();
+						
+     :: else ->	
+        sBottomMutexP();
+        if :: carsDown == 0 ->
+            sInAlleyP();
+         :: else -> skip;
+        fi;
+        carsDown++;
+        sBottomMutexV();
+    fi;						
+}
+
+inline alleyLeave(no)
+{
+	if :: no < N/2 -> 
+        sTopMutexP();
+        carsTop--;
+        if :: carsTop == 0 ->
+            sInAlleyV();
+          :: else -> skip;
+        fi;
+        sTopMutexV();
+						
+     :: else 	->	
+        sBottomMutexP();
+        carsDown--;
+        if :: carsDown == 0 ->
+            sInAlleyV();
+          :: else -> skip;
+        fi;
+        sBottomMutexV();
+    fi;	
+}
+
+
+active [N] proctype Car()
+{
+	do 
+	::	/* Run around the loop for indeterminate time*/
+		do :: true -> skip :: break od; 
+
+enter:		alleyEnter(_pid);
+
+		/* Run around the loop for indeterminate time*/
+inside:		do :: true -> skip :: break od; 
+
+leave:		alleyLeave(_pid);
+	od
+}
+
+
+ltl mutex { [](carsTop==0 || carsDown==0) }
+
+ltl obl { [](((Car[0]@enter) && [] (!Car[1]@enter) ) -> 
+    <> (Car[0]@inside)) } 
+    
+ltl res { []((Car[0]@enter) && (Car[N]@enter) -> 
+    <>((Car[0]@inside) || (Car[N]@inside))) }
+\end{lstlisting}

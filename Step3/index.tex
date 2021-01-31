@@ -1,0 +1,38 @@
+\section{Barrier - Step 3}
+The next task was to implement a barrier system. The barrier stop cars trying to pass through, until all cars have arrived at the barrier. This allows for synchronization between the cars each lap. 
+
+The barrier consists of three methods: \texttt{on}, \texttt{off} and \texttt{sync}. As \texttt{sync} is the most important method, given that it implements the functionality of the barrier, we will describe this first.
+
+Below is the code for the \texttt{sync} method.
+\begin{lstlisting}
+    public void sync(int no, Pos curpos) {
+        if ( barrierOnline ) {
+            try {
+                internal.P();
+                carsAtBarrier++;
+                if(carsAtBarrier==9) {
+                    for(int i = 0; i < 9; i++) {
+                        barrierSemaphores[i].V();
+                    }
+                    carsAtBarrier = 0;
+                }
+                internal.V();
+                barrierSemaphores[no].P();
+            } catch (Exception e) {}
+        }
+    }
+\end{lstlisting}
+
+In order to implement the barrier system, a new class \texttt{Barrier} was created. The barrier needs all cars to be present before activating, so an integer \texttt{carsAtBarrier} was chosen to keep track of how many cars have arrived. When a car arrives at the barrier, it runs the \texttt{sync} method in the barrier. First, it checks whether or not the barrier is turned on, signified by the boolean flag \texttt{barrierOnline}. If the barrier is not turned on, the car is immediately allowed to pass through, and the program will function as in Step 1, described in section \textbf{\ref{step1}}. If, however, the barrier is on, the barrier grabs its internal semaphore \texttt{internal}. The variable \texttt{carsAtBarrier} gets incremented accordingly. This is done inside the critical region so as to not risk multiple cars arriving at the same time having simultanious access, thus creating a race condition. After incrementing the variable, the barrier leaves the critical section by releasing the \texttt{internal} semaphore. At this point, the car will try to take the barrier semaphore, corresponging to its car number, from the semaphore list \texttt{barrierSemaphores}. When all 9 cars have arrived at the barrier, the last car to arrive will trigger a loop over the entire \texttt{barrierSemaphores} array, releasing semaphores onto each spot, and resetting the car counter. 
+
+When the barrier is turned on by the \texttt{on} method, the semaphores in \texttt{barrierSemaphores} all get re-initiated and set to 0. This makes it so the cars will all stop at the barrier, even if they approach it immediately after creation. When the the barrier is turned off by the \texttt{off} method, semaphores are released to all spots in the \texttt{barrierSemaphores} array before turning off the barrier itself. This prevents cars from getting stuck waiting for a semaphore at the barrier until it is turned on again.
+
+As the barrier relies on all cars to be at the gate, and all cars to be waiting for a semaphore, we wish to fulfill the predicate
+
+\begin{gather*}
+    B \triangleq \texttt{carsAtBarrier} = 9 \leadsto \forall \texttt{c} \left( \texttt{barrierSemaphores[c]} = 1 \right) 
+\end{gather*}
+
+That is, if all cars have arrived at the barrier, then a snapshot of the semaphore array would show them all to be 1. This is shown to be true in the implementation, as the semaphores are only released when \texttt{carsAtBarrier} is set to 9. As the \texttt{sync} method is mutually exclusive with the rest of the program, synchronizing the cars can be seen as an atomic action. As such, when the last car reaches the barrier, it atomically increments \texttt{carsAtBarrier}, checks that it is equal to 9 and releases semaphores to all the other cars. As such, the predicate can be assume fulfilled.
+
+In order to test the barrier, we again set the speed of all cars to be 5. This makes the cars go to the barrier almost immediately after leaving it, thus testing how often we can synchronize the cars. We found that this high speed did not affect the synchronization of the cars at all.

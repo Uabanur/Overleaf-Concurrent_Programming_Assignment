@@ -1,0 +1,130 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\usepackage[english]{babel}
+\usepackage{parskip}
+\usepackage{tablefootnote}
+\usepackage[nottoc]{tocbibind}
+\usepackage{amssymb}
+\usepackage{ stmaryrd }
+\usepackage{mathtools} 
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+ total={140mm,227mm},
+ left=35mm,
+ top=35mm,
+ }
+
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{amsmath}
+\usepackage{bm}
+
+\numberwithin{figure}{section}
+% equation number format: in section 1, (1.1), (1.2) ..
+\usepackage{amsmath}
+\numberwithin{equation}{section}
+
+\makeatletter
+% we use \prefix@<level> only if it is defined
+\renewcommand{\@seccntformat}[1]{%
+  \ifcsname prefix@#1\endcsname
+    \csname prefix@#1\endcsname
+  \else
+    \csname the#1\endcsname\quad
+  \fi}
+% define \prefix@section
+% \newcommand\prefix@section{}
+\makeatother
+
+%% multi col
+\usepackage{multicol}
+\usepackage{titletoc}
+\usepackage{siunitx}
+
+\usepackage[colorlinks]{hyperref}
+
+% hyperlinks
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=red,
+    urlcolor=blue,
+    filecolor=red,
+    bookmarksopen=true
+} 
+\urlstyle{same}
+
+
+% colored frames (boxes)
+\usepackage{xcolor}
+\usepackage{mdframed}
+
+% vector arrow with \vv{ }
+\usepackage{esvect}
+
+%\hyphenpenalty 10000
+%\exhyphenpenalty 10000
+%\usepackage[none]{hyphenat}
+%\usepackage[document]{ragged2e}
+
+% strike through text
+\usepackage[normalem]{ulem}
+% \sout{Hello World}
+
+\usepackage{listings}
+\lstset{language=C,
+basicstyle=\ttfamily,
+keywordstyle=\color{blue}\ttfamily,
+stringstyle=\color{red}\ttfamily,
+showstringspaces=false,
+commentstyle=\color{purple}\ttfamily,
+morecomment=[l][\color{magenta}]{\#}, 
+%numbers=left,
+captionpos=b,       
+numbersep=5pt, 
+backgroundcolor=\color{white}, 
+breaklines=true
+}
+
+\usepackage{siunitx}
+%\usepackage{unixode}
+
+
+% spacing in enum and itemize
+\usepackage{enumitem}
+
+% \usepackage{slantsc}
+\usepackage{bold-extra}
+% New commands 
+
+
+\usepackage{caption}
+\usepackage{subcaption}
+
+\usepackage{physics}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usepackage{mathdots}
+\usepackage{yhmath}
+\usepackage{cancel}
+\usepackage{color}
+\usepackage{siunitx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{amssymb}
+\usepackage{gensymb}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usetikzlibrary{fadings}
+\usetikzlibrary{patterns}
+\usetikzlibrary{shadows.blur}
+\usetikzlibrary{shapes}
+
+
+%%%%%%%%%%%%%%%%%%
+%% HEADER OVER %%%
+%%%%%%%%%%%%%%%%%%

@@ -1,0 +1,60 @@
+\input{header.tex}
+
+\title{Concurrent Programming Assignment}
+\author{s154666 Mikkel Clausen Knudsen\\
+        s144107 Roar Nind Steffensen\\
+        \textbf{Group 3}}
+\date{}
+
+\begin{document}
+\clearpage
+\maketitle
+\thispagestyle{empty}
+\vspace{-1cm}
+\tableofcontents
+
+\vfill
+\begin{multicols}{2}
+Signature: \rule{0.75\linewidth}{.4pt}
+
+Signature: \rule{0.75\linewidth}{.4pt}
+\end{multicols}
+
+
+\begin{table}
+    \centering
+    \begin{tabular}{|c|c|c|} \hline
+        Section & Roar & Mikkel \\ \hline
+        Introduction & X & X \\ \hline
+        Bumping and alley sunchronization & & X \\ \hline
+        SPIN verification and alley sunchronization & X & \\ \hline
+        Barrier & & X \\ \hline
+        Monitors & X & \\ \hline
+        Bridge & & X \\ \hline
+        Car removal and restoration & X & \\ \hline 
+        Conclusion & X & X \\ \hline 
+    \end{tabular}
+    \caption{Work distribution for the report. All participants have contributed equally to all parts of the code.}
+    \label{tab:work_distribution}
+\end{table}
+
+\newpage
+\setcounter{page}{1}
+\input{Introduction/config.tex}
+\input{Step1/config.tex}
+\input{Step2/config.tex}
+\input{Step3/config.tex}
+\input{Step4/config.tex}
+\input{Step5/config.tex}
+\input{Step6/config.tex}
+\input{Conclusion/config.tex}
+
+\bibliographystyle{acm}
+\bibliography{bibliography}
+
+\newpage
+\section*{Appendix - Source code}
+\addcontentsline{toc}{section}{Appendix - Source code}
+\input{SourceCode/config.tex}
+
+\end{document}

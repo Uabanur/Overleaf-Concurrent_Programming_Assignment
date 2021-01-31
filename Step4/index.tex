@@ -1,0 +1,63 @@
+\section{Monitors - Step 4}
+\label{step4}
+So far the synchronization protocols have been implemented with semaphores. We will now look at monitors and how they can simplify these protocols. 
+
+Monitors can be seen as a unit/object with all internal operations in the same critical region, meaning that all operations in a monitor are mutually excluded. A tool in a monitor for process management is condition variables. Condition variables can be used to store/suspend processes/threads until they are released. When a process is suspended in a condition variable, the critical region is released, and a waiting thread can enter the monitor. In \texttt{Java} all objects can be used as a monitor by using the keyword \texttt{synchronized}, and instead of different condition variables a single condition queue is available. Since \texttt{Java} monitors are based on \texttt{PThread} monitors, they succumb to spurious wakeups. To counter this, a release is extended to a guarded release. When the thread is woken up, it is put back in the condition queue if the guard is not satisfied. 
+
+The \textit{bumping}, \textit{alley synchronization} and \textit{barrier} protocols are discussed with respect to \texttt{Java monitors} in the following subsections.
+
+\subsection{Bumping}
+Since the implemented protocol for mutual exclusion between tiles, ensuring no bumping between cars, is unconditional, the semaphore solution is very simple. Transforming this into a monitor solution could be done with a table of booleans containing information if whether a tile is occupied or not, which is not simpler than the semaphore solution.
+
+The mutual exclusion between tiles is not changed to a monitor solution.
+
+\subsection{Alley synchronization}
+The alley synchronization is implemented with essentially three overlapping critical sections. The two auxilliary critical sections for \texttt{topMutex} and \texttt{bottomMutex} are not needed with a monitor solution. Instead when the last car from a group leaves the alley, it performs \texttt{notifyAll}, releasing all cars from the condition queue. The difference between the semaphore solution to the monitor solution, is that a \texttt{notify}/\texttt{notifyAll} in a monitor only releases suspended threads and has no effect on an empty condition queue, compared to a \texttt{V} operation on a semaphore, where if no car is waiting, the next approaching car can take the semaphore. 
+
+The alley synchronization is changed to a monitor solution. When a car tries to enter the alley, it is allowed through if no opposing cars are in the alley, otherwise it is placed in the condition queue. When a car leaves the alley, if it is the last car from its group (equivalent to the last car at all in the alley) it notifies all cars in the condition queues. The \texttt{notifyAll} operation in this case is not exhausting, since the car is assured to be the last from its group and therefore all waiting cars must be from the opposing group, and should all enter, meaning all cars are released from the queue. The \texttt{enter} and \texttt{leave} protocols are seen in code snippet \ref{src:enter_mon} and \ref{src:leave_mon}.
+\begin{figure}[H]
+\begin{multicols}{2}
+\begin{lstlisting}[language=java, caption=\texttt{enter} protocol, label=src:enter_mon]
+public synchronized void enter(int no) throws Exception
+{
+    if(no<=4) //Top going down
+    {   
+        while(carsBottom > 0) wait();
+        carsTop++;
+    }
+    else //Bottom going up
+    { 
+        while(carsTop > 0) wait();
+        carsBottom++;
+    }
+}
+\end{lstlisting}
+\begin{lstlisting}[language=java, caption=\texttt{leave} protocol, label=src:leave_mon]
+public synchronized void leave(int no) throws Exception
+{
+    if(no<=4) //Top going down
+    {
+        carsTop--;
+        if(carsTop==0)
+            notifyAll();
+    }
+    else //Bottom going up
+    { 
+        carsBottom--;
+        if(carsBottom==0)
+            notifyAll();
+    }
+}
+\end{lstlisting}
+\end{multicols}
+\end{figure}
+
+
+\subsection{Barrier}
+
+The release signal (group of \texttt{V} operations) from the last car approaching the barrier with semaphores is essentially the same as a \texttt{notifyAll} for a monitor. Translating the barrier synchronization into a monitor solution is therefore straightforward and can be seen in the source code.
+
+For the \texttt{shutdown} operation for the barrier, if the barrier is off, it simply returns. If the barrier is on, a \texttt{shutdown} flag in the barrier is set and if no cars are waiting the barrier is turned off. If cars were waiting at the barrier when \texttt{shutdown} was called, the last car arriving at the barrier, releasing the cars will also check the \texttt{shutdown} flag, and if set, turn the barrier off. This way the barrier is only turned off when no cars are waiting. The last scenario results in a \texttt{notifyAll} operation being called twice, but since the condition queue is empty the second time, the last call is equavalent to a \texttt{skip}.
+
+\subsection{Testing}
+Since we have adapted the entire program to use monitors instead of semaphores, we want to test whether or not the program can function under the same conditions as before. In order to do this, we set the speed of the cars to be 5 once more, and see if we get the same results as in previous steps. This proved to be true, as neither bumping, alley exclusion or barrier synchronization were broken through this increased speed. 

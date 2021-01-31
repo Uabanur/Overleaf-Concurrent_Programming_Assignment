@@ -1,0 +1,27 @@
+\section{Bumping and alley synchronization - Step 1}
+\label{step1}
+The first step in the assignment was to ensure that no cars would crash into each other while driving around. This encompassed both cars going through the alley, but also cars driving on the same lane. For cars driving on the same lane, a system of semaphores were implemented. A semaphore was placed on each tile on the courtyard. When a car is about to move, it first tries to grab the semaphore of the tile it is trying to move to. If another car is already occupying this space, the semaphore has already been grabbed, and as such the approaching car is forced to wait. When a car leaves a tile, it releases the semaphore as the last step in its move operation, thus assuring that it has already moved before another car is let onto the tile.
+
+This same concept carries over to the alley, but here lies another problem - the cars can approach from either side of the alley! This means that if two cars going in different directions meet in the alley, a deadlock will occur. In order to prevent this, a separate system of semaphores were implemented. Here we have two semaphores, a semaphore for the cars approaching from the top (\texttt{topMutex}) and one for those approaching from the bottom (\texttt{bottomMutex}). These semaphores ensure mutual exclusiveness for cars trying to enter/leave the alley. This was implemented to ensure that the counter-variables \texttt{carsTop} and \texttt{carsBottom} have values corresponding to the correct amount of cars in the alley. Besides these, there is also a semaphore for the alley itself, called \texttt{inAlley}. The scenario for entering the alley is the same no matter which side the cars approach from, so we will focus on cars approaching from the top for this example. 
+
+When the first car tries to enter the alley, it will grab the \texttt{topMutex} semaphore. This semaphore ensures mutual exclusion between threads when cars try to access the alley. It will then check if any other cars have already entered the alley from the top. If none have, it will then try to grab the \texttt{inAlley} semaphore. After successfully grabbing the \texttt{inAlley} semaphore, thus being allowed to enter the alley, the car increments the value \texttt{carsTop}, signifying that a car has entered the alley from the top. Upon entering the alley, the car releasess the \texttt{topMutex} semaphore, thus allowing another car to attempt entering as well. Cars entering after the first will see that \texttt{carsTop} is different from 0, and thus will not try to grab the \texttt{inAlley} semaphore. When a car leaves the alley, it first grabs the \texttt{topMutex} semaphore so as to ensure mutual exclusion with cars entering the alley. The car then decrements the \texttt{carsTop} variable, signifying that it is no longer in the alley. If it is the last car exiting the alley, i.e. \texttt{carsTop = 0}, then the \texttt{inAlley} semaphore is released, allowing cars from the bottom to enter the alley. Lastly, the \texttt{topMutex} semaphore is released, ending the critical region.
+
+This implementation is heavily inspired by the reader/writer problem with regards to writing in memory\cite{andrews}. Multiple readers are allowed to read from memory at the same time, but only if no writer is already accessing. Likewise, a writer can only access memory if no readers are accessing memory, but only a single writer is allowed access to memory at the same time. Here, we instead have two sets of "readers" that allow their own to follow them into the critical region, but exclude the other group. Like in the reader/writer problem, we risk starvation of the excluded group as one group may keep wanting to access the critical region. In this assignment, it can happen if one group of cars drive fast enough to make it into the alley before the last of their own are going through the alley. This is especially present if we introduce slowdown in the alley. If four cars go into the alley in a line, it is highly likely that the first to enter will make it all the way around the course and go into the alley before the last car has made it through the alley the first time. Without speed reduction this is less of an issue, as the speed between laps does not vary enough that one car can act as a "plug" in the alley.
+
+As the next part of the assignment will focus on verifying this program, we will make no attempts to do so here. We did, however, test the functionality of the program. This was done by setting the speed of all the cars to 5, and seeing if any of the cars bumped into each other. No such occurences happend, and as such our implementation works regardless of how fast the cars drive. A problem did arise when the speed of the cars was set to 0 or 1, but this proved to be purely within the graphical interface. No two cars ever occupy the same tile if we look purely at the variables. 
+ 
+%Analyze, solve and implement the following control problems:
+%\begin{itemize}
+%    \item Cars should not bump into each other.
+%    \item No deadlocks should occur.
+%\end{itemize}
+
+%Using the semaphores
+
+%Avoid unnecessary delays
+
+%Follow each other in the alley
+
+
+%Discuss to which extent the cars may experience starvation in your solution, both with and without the alley speed reduction.
+ 
